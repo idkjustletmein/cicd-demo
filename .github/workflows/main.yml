@@ -1,0 +1,376 @@
+name: CI/CD Pipeline
+
+
+
+on:
+
+&nbsp; push:
+
+&nbsp;   branches: \[ main, develop ]
+
+&nbsp; pull\_request:
+
+&nbsp;   branches: \[ main ]
+
+
+
+env:
+
+&nbsp; PYTHON\_VERSION: '3.9'
+
+
+
+jobs:
+
+&nbsp; test:
+
+&nbsp;   name: Unit Testing
+
+&nbsp;   runs-on: ubuntu-latest
+
+&nbsp;   
+
+&nbsp;   steps:
+
+&nbsp;   - name: Checkout code
+
+&nbsp;     uses: actions/checkout@v3
+
+&nbsp;   
+
+&nbsp;   - name: Set up Python
+
+&nbsp;     uses: actions/setup-python@v4
+
+&nbsp;     with:
+
+&nbsp;       python-version: ${{ env.PYTHON\_VERSION }}
+
+&nbsp;   
+
+&nbsp;   - name: Cache dependencies
+
+&nbsp;     uses: actions/cache@v3
+
+&nbsp;     with:
+
+&nbsp;       path: ~/.cache/pip
+
+&nbsp;       key: ${{ runner.os }}-pip-${{ hashFiles('\*\*/requirements.txt') }}
+
+&nbsp;       restore-keys: |
+
+&nbsp;         ${{ runner.os }}-pip-
+
+&nbsp;   
+
+&nbsp;   - name: Install dependencies
+
+&nbsp;     run: |
+
+&nbsp;       python -m pip install --upgrade pip
+
+&nbsp;       pip install -r requirements.txt
+
+&nbsp;   
+
+&nbsp;   - name: Run tests with coverage
+
+&nbsp;     run: |
+
+&nbsp;       pytest --cov=app --cov-report=xml --cov-report=html --cov-report=term
+
+&nbsp;   
+
+&nbsp;   - name: Upload coverage reports
+
+&nbsp;     uses: actions/upload-artifact@v3
+
+&nbsp;     with:
+
+&nbsp;       name: coverage-report
+
+&nbsp;       path: htmlcov/
+
+&nbsp;   
+
+&nbsp;   - name: Display test summary
+
+&nbsp;     run: |
+
+&nbsp;       echo "✅ All tests passed successfully!"
+
+
+
+&nbsp; code-quality:
+
+&nbsp;   name: Code Quality Analysis
+
+&nbsp;   runs-on: ubuntu-latest
+
+&nbsp;   needs: test
+
+&nbsp;   
+
+&nbsp;   steps:
+
+&nbsp;   - name: Checkout code
+
+&nbsp;     uses: actions/checkout@v3
+
+&nbsp;     with:
+
+&nbsp;       fetch-depth: 0  # Full history for better analysis
+
+&nbsp;   
+
+&nbsp;   - name: SonarQube Scan
+
+&nbsp;     uses: SonarSource/sonarqube-scan-action@master
+
+&nbsp;     env:
+
+&nbsp;       SONAR\_TOKEN: ${{ secrets.SONAR\_TOKEN }}
+
+&nbsp;       SONAR\_HOST\_URL: ${{ secrets.SONAR\_HOST\_URL }}
+
+&nbsp;   
+
+&nbsp;   - name: SonarQube Quality Gate
+
+&nbsp;     uses: SonarSource/sonarqube-quality-gate-action@master
+
+&nbsp;     timeout-minutes: 5
+
+&nbsp;     env:
+
+&nbsp;       SONAR\_TOKEN: ${{ secrets.SONAR\_TOKEN }}
+
+&nbsp;     continue-on-error: true
+
+
+
+&nbsp; build:
+
+&nbsp;   name: Build Docker Image
+
+&nbsp;   runs-on: ubuntu-latest
+
+&nbsp;   needs: \[test, code-quality]
+
+&nbsp;   
+
+&nbsp;   steps:
+
+&nbsp;   - name: Checkout code
+
+&nbsp;     uses: actions/checkout@v3
+
+&nbsp;   
+
+&nbsp;   - name: Set up Docker Buildx
+
+&nbsp;     uses: docker/setup-buildx-action@v2
+
+&nbsp;   
+
+&nbsp;   - name: Log in to Heroku Container Registry
+
+&nbsp;     env:
+
+&nbsp;       HEROKU\_API\_KEY: ${{ secrets.HEROKU\_API\_KEY }}
+
+&nbsp;     run: |
+
+&nbsp;       echo $HEROKU\_API\_KEY | docker login --username=\_ --password-stdin registry.heroku.com
+
+&nbsp;   
+
+&nbsp;   - name: Build and push Docker image
+
+&nbsp;     env:
+
+&nbsp;       HEROKU\_APP\_NAME: ${{ secrets.HEROKU\_APP\_NAME }}
+
+&nbsp;     run: |
+
+&nbsp;       docker build -t registry.heroku.com/$HEROKU\_APP\_NAME/web .
+
+&nbsp;       docker push registry.heroku.com/$HEROKU\_APP\_NAME/web
+
+&nbsp;   
+
+&nbsp;   - name: Display build info
+
+&nbsp;     run: |
+
+&nbsp;       echo "🐳 Docker image built successfully!"
+
+&nbsp;       echo "Image: registry.heroku.com/${{ secrets.HEROKU\_APP\_NAME }}/web"
+
+
+
+&nbsp; deploy:
+
+&nbsp;   name: Deploy to Heroku
+
+&nbsp;   runs-on: ubuntu-latest
+
+&nbsp;   needs: build
+
+&nbsp;   if: github.ref == 'refs/heads/main'
+
+&nbsp;   
+
+&nbsp;   steps:
+
+&nbsp;   - name: Checkout code
+
+&nbsp;     uses: actions/checkout@v3
+
+&nbsp;   
+
+&nbsp;   - name: Deploy to Heroku
+
+&nbsp;     env:
+
+&nbsp;       HEROKU\_API\_KEY: ${{ secrets.HEROKU\_API\_KEY }}
+
+&nbsp;       HEROKU\_APP\_NAME: ${{ secrets.HEROKU\_APP\_NAME }}
+
+&nbsp;     run: |
+
+&nbsp;       heroku container:release web --app $HEROKU\_APP\_NAME
+
+&nbsp;   
+
+&nbsp;   - name: Verify deployment
+
+&nbsp;     env:
+
+&nbsp;       HEROKU\_APP\_NAME: ${{ secrets.HEROKU\_APP\_NAME }}
+
+&nbsp;     run: |
+
+&nbsp;       curl -f https://$HEROKU\_APP\_NAME.herokuapp.com/health || exit 1
+
+&nbsp;       echo "✅ Deployment verified successfully!"
+
+
+
+&nbsp; notify:
+
+&nbsp;   name: Send Notifications
+
+&nbsp;   runs-on: ubuntu-latest
+
+&nbsp;   needs: \[test, code-quality, build, deploy]
+
+&nbsp;   if: always()
+
+&nbsp;   
+
+&nbsp;   steps:
+
+&nbsp;   - name: Send Discord notification (Success)
+
+&nbsp;     if: ${{ success() }}
+
+&nbsp;     env:
+
+&nbsp;       DISCORD\_WEBHOOK: ${{ secrets.DISCORD\_WEBHOOK }}
+
+&nbsp;     run: |
+
+&nbsp;       curl -H "Content-Type: application/json" \\
+
+&nbsp;         -X POST \\
+
+&nbsp;         -d '{
+
+&nbsp;           "username": "CI/CD Bot",
+
+&nbsp;           "avatar\_url": "https://github.githubassets.com/images/modules/logos\_page/GitHub-Mark.png",
+
+&nbsp;           "embeds": \[{
+
+&nbsp;             "title": "✅ Pipeline Succeeded",
+
+&nbsp;             "description": "All stages completed successfully!",
+
+&nbsp;             "color": 3066993,
+
+&nbsp;             "fields": \[
+
+&nbsp;               {"name": "Repository", "value": "${{ github.repository }}", "inline": true},
+
+&nbsp;               {"name": "Branch", "value": "${{ github.ref\_name }}", "inline": true},
+
+&nbsp;               {"name": "Commit", "value": "`${{ github.sha }}`", "inline": false},
+
+&nbsp;               {"name": "Author", "value": "${{ github.actor }}", "inline": true},
+
+&nbsp;               {"name": "Workflow", "value": "${{ github.workflow }}", "inline": true}
+
+&nbsp;             ],
+
+&nbsp;             "timestamp": "${{ github.event.head\_commit.timestamp }}"
+
+&nbsp;           }]
+
+&nbsp;         }' \\
+
+&nbsp;         $DISCORD\_WEBHOOK
+
+&nbsp;   
+
+&nbsp;   - name: Send Discord notification (Failure)
+
+&nbsp;     if: ${{ failure() }}
+
+&nbsp;     env:
+
+&nbsp;       DISCORD\_WEBHOOK: ${{ secrets.DISCORD\_WEBHOOK }}
+
+&nbsp;     run: |
+
+&nbsp;       curl -H "Content-Type: application/json" \\
+
+&nbsp;         -X POST \\
+
+&nbsp;         -d '{
+
+&nbsp;           "username": "CI/CD Bot",
+
+&nbsp;           "avatar\_url": "https://github.githubassets.com/images/modules/logos\_page/GitHub-Mark.png",
+
+&nbsp;           "embeds": \[{
+
+&nbsp;             "title": "❌ Pipeline Failed",
+
+&nbsp;             "description": "One or more stages failed. Check the logs for details.",
+
+&nbsp;             "color": 15158332,
+
+&nbsp;             "fields": \[
+
+&nbsp;               {"name": "Repository", "value": "${{ github.repository }}", "inline": true},
+
+&nbsp;               {"name": "Branch", "value": "${{ github.ref\_name }}", "inline": true},
+
+&nbsp;               {"name": "Commit", "value": "`${{ github.sha }}`", "inline": false},
+
+&nbsp;               {"name": "Author", "value": "${{ github.actor }}", "inline": true},
+
+&nbsp;               {"name": "Run URL", "value": "\[View Logs](${{ github.server\_url }}/${{ github.repository }}/actions/runs/${{ github.run\_id }})", "inline": false}
+
+&nbsp;             ],
+
+&nbsp;             "timestamp": "${{ github.event.head\_commit.timestamp }}"
+
+&nbsp;           }]
+
+&nbsp;         }' \\
+
+&nbsp;         $DISCORD\_WEBHOOK
+
