@@ -21,7 +21,7 @@ task_id_counter = 3
 def home():
     """Home endpoint with API information"""
     return jsonify({
-        "message": "Welcome to CI/CD Demo API",
+        "message": "Welcome to CI/CD Demo API you idiot",
         "version": "1.0.0",
         "endpoints": {
             "GET /": "API information",
