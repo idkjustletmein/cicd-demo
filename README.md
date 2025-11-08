@@ -2,7 +2,7 @@
 
 A Flask-based REST API demonstrating automated CI/CD pipeline implementation with GitHub Actions, pytest, SonarQube, Docker, and Heroku.
 
-## 📋 Project Overview
+## 📋 Project Overview 😂
 
 This project implements a complete CI/CD pipeline that automates:
 - Unit testing with pytest
