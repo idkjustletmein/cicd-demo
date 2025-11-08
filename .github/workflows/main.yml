@@ -4,373 +4,373 @@ name: CI/CD Pipeline
 
 on:
 
-&nbsp; push:
+ push:
 
-&nbsp;   branches: \[ main, develop ]
+   branches: \[ main, develop ]
 
-&nbsp; pull\_request:
+ pull_request:
 
-&nbsp;   branches: \[ main ]
+   branches: \[ main ]
 
 
 
 env:
 
-&nbsp; PYTHON\_VERSION: '3.9'
+ PYTHON\_VERSION: '3.9'
 
 
 
 jobs:
 
-&nbsp; test:
+ test:
 
-&nbsp;   name: Unit Testing
+   name: Unit Testing
 
-&nbsp;   runs-on: ubuntu-latest
+   runs-on: ubuntu-latest
 
-&nbsp;   
+   
 
-&nbsp;   steps:
+   steps:
 
-&nbsp;   - name: Checkout code
+   - name: Checkout code
 
-&nbsp;     uses: actions/checkout@v3
+     uses: actions/checkout@v3
 
-&nbsp;   
+   
 
-&nbsp;   - name: Set up Python
+   - name: Set up Python
 
-&nbsp;     uses: actions/setup-python@v4
+     uses: actions/setup-python@v4
 
-&nbsp;     with:
+     with:
 
-&nbsp;       python-version: ${{ env.PYTHON\_VERSION }}
+       python-version: ${{ env.PYTHON_VERSION }}
 
-&nbsp;   
+   
 
-&nbsp;   - name: Cache dependencies
+   - name: Cache dependencies
 
-&nbsp;     uses: actions/cache@v3
+     uses: actions/cache@v3
 
-&nbsp;     with:
+     with:
 
-&nbsp;       path: ~/.cache/pip
+       path: ~/.cache/pip
 
-&nbsp;       key: ${{ runner.os }}-pip-${{ hashFiles('\*\*/requirements.txt') }}
+       key: ${{ runner.os }}-pip-${{ hashFiles('\*\*/requirements.txt') }}
 
-&nbsp;       restore-keys: |
+       restore-keys: |
 
-&nbsp;         ${{ runner.os }}-pip-
+         ${{ runner.os }}-pip-
 
-&nbsp;   
+   
 
-&nbsp;   - name: Install dependencies
+   - name: Install dependencies
 
-&nbsp;     run: |
+     run: |
 
-&nbsp;       python -m pip install --upgrade pip
+       python -m pip install --upgrade pip
 
-&nbsp;       pip install -r requirements.txt
+       pip install -r requirements.txt
 
-&nbsp;   
+   
 
-&nbsp;   - name: Run tests with coverage
+   - name: Run tests with coverage
 
-&nbsp;     run: |
+     run: |
 
-&nbsp;       pytest --cov=app --cov-report=xml --cov-report=html --cov-report=term
+       pytest --cov=app --cov-report=xml --cov-report=html --cov-report=term
 
-&nbsp;   
+   
 
-&nbsp;   - name: Upload coverage reports
+   - name: Upload coverage reports
 
-&nbsp;     uses: actions/upload-artifact@v3
+     uses: actions/upload-artifact@v3
 
-&nbsp;     with:
+     with:
 
-&nbsp;       name: coverage-report
+       name: coverage-report
 
-&nbsp;       path: htmlcov/
+       path: htmlcov/
 
-&nbsp;   
+   
 
-&nbsp;   - name: Display test summary
+   - name: Display test summary
 
-&nbsp;     run: |
+     run: |
 
-&nbsp;       echo "✅ All tests passed successfully!"
+       echo "✅ All tests passed successfully!"
 
 
 
-&nbsp; code-quality:
+ code-quality:
 
-&nbsp;   name: Code Quality Analysis
+   name: Code Quality Analysis
 
-&nbsp;   runs-on: ubuntu-latest
+   runs-on: ubuntu-latest
 
-&nbsp;   needs: test
+   needs: test
 
-&nbsp;   
+   
 
-&nbsp;   steps:
+   steps:
 
-&nbsp;   - name: Checkout code
+   - name: Checkout code
 
-&nbsp;     uses: actions/checkout@v3
+     uses: actions/checkout@v3
 
-&nbsp;     with:
+     with:
 
-&nbsp;       fetch-depth: 0  # Full history for better analysis
+       fetch-depth: 0  # Full history for better analysis
 
-&nbsp;   
+   
 
-&nbsp;   - name: SonarQube Scan
+   - name: SonarQube Scan
 
-&nbsp;     uses: SonarSource/sonarqube-scan-action@master
+     uses: SonarSource/sonarqube-scan-action@master
 
-&nbsp;     env:
+     env:
 
-&nbsp;       SONAR\_TOKEN: ${{ secrets.SONAR\_TOKEN }}
+       SONAR\_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-&nbsp;       SONAR\_HOST\_URL: ${{ secrets.SONAR\_HOST\_URL }}
+       SONAR\_HOST\_URL: ${{ secrets.SONAR_HOST_URL }}
 
-&nbsp;   
+   
 
-&nbsp;   - name: SonarQube Quality Gate
+   - name: SonarQube Quality Gate
 
-&nbsp;     uses: SonarSource/sonarqube-quality-gate-action@master
+     uses: SonarSource/sonarqube-quality-gate-action@master
 
-&nbsp;     timeout-minutes: 5
+     timeout-minutes: 5
 
-&nbsp;     env:
+     env:
 
-&nbsp;       SONAR\_TOKEN: ${{ secrets.SONAR\_TOKEN }}
+       SONAR\_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-&nbsp;     continue-on-error: true
+     continue-on-error: true
 
 
 
-&nbsp; build:
+ build:
 
-&nbsp;   name: Build Docker Image
+   name: Build Docker Image
 
-&nbsp;   runs-on: ubuntu-latest
+   runs-on: ubuntu-latest
 
-&nbsp;   needs: \[test, code-quality]
+   needs: [test, code-quality]
 
-&nbsp;   
+   
 
-&nbsp;   steps:
+   steps:
 
-&nbsp;   - name: Checkout code
+   - name: Checkout code
 
-&nbsp;     uses: actions/checkout@v3
+     uses: actions/checkout@v3
 
-&nbsp;   
+   
 
-&nbsp;   - name: Set up Docker Buildx
+   - name: Set up Docker Buildx
 
-&nbsp;     uses: docker/setup-buildx-action@v2
+     uses: docker/setup-buildx-action@v2
 
-&nbsp;   
+   
 
-&nbsp;   - name: Log in to Heroku Container Registry
+   - name: Log in to Heroku Container Registry
 
-&nbsp;     env:
+     env:
 
-&nbsp;       HEROKU\_API\_KEY: ${{ secrets.HEROKU\_API\_KEY }}
+       HEROKU\_API\_KEY: ${{ secrets.HEROKU_API_KEY }}
 
-&nbsp;     run: |
+     run: |
 
-&nbsp;       echo $HEROKU\_API\_KEY | docker login --username=\_ --password-stdin registry.heroku.com
+       echo $HEROKU\_API\_KEY | docker login --username=\_ --password-stdin registry.heroku.com
 
-&nbsp;   
+   
 
-&nbsp;   - name: Build and push Docker image
+   - name: Build and push Docker image
 
-&nbsp;     env:
+     env:
 
-&nbsp;       HEROKU\_APP\_NAME: ${{ secrets.HEROKU\_APP\_NAME }}
+       HEROKU\_APP\_NAME: ${{ secrets.HEROKU_APP_NAME }}
 
-&nbsp;     run: |
+     run: |
 
-&nbsp;       docker build -t registry.heroku.com/$HEROKU\_APP\_NAME/web .
+       docker build -t registry.heroku.com/$HEROKU\_APP\_NAME/web .
 
-&nbsp;       docker push registry.heroku.com/$HEROKU\_APP\_NAME/web
+       docker push registry.heroku.com/$HEROKU\_APP\_NAME/web
 
-&nbsp;   
+   
 
-&nbsp;   - name: Display build info
+   - name: Display build info
 
-&nbsp;     run: |
+     run: |
 
-&nbsp;       echo "🐳 Docker image built successfully!"
+       echo "🐳 Docker image built successfully!"
 
-&nbsp;       echo "Image: registry.heroku.com/${{ secrets.HEROKU\_APP\_NAME }}/web"
+       echo "Image: registry.heroku.com/${{ secrets.HEROKU_APP_NAME }}/web"
 
 
 
-&nbsp; deploy:
+ deploy:
 
-&nbsp;   name: Deploy to Heroku
+   name: Deploy to Heroku
 
-&nbsp;   runs-on: ubuntu-latest
+   runs-on: ubuntu-latest
 
-&nbsp;   needs: build
+   needs: build
 
-&nbsp;   if: github.ref == 'refs/heads/main'
+   if: github.ref == 'refs/heads/main'
 
-&nbsp;   
+   
 
-&nbsp;   steps:
+   steps:
 
-&nbsp;   - name: Checkout code
+   - name: Checkout code
 
-&nbsp;     uses: actions/checkout@v3
+     uses: actions/checkout@v3
 
-&nbsp;   
+   
 
-&nbsp;   - name: Deploy to Heroku
+   - name: Deploy to Heroku
 
-&nbsp;     env:
+     env:
 
-&nbsp;       HEROKU\_API\_KEY: ${{ secrets.HEROKU\_API\_KEY }}
+       HEROKU\_API\_KEY: ${{ secrets.HEROKU_API_KEY }}
 
-&nbsp;       HEROKU\_APP\_NAME: ${{ secrets.HEROKU\_APP\_NAME }}
+       HEROKU\_APP\_NAME: ${{ secrets.HEROKU_APP_NAME }}
 
-&nbsp;     run: |
+     run: |
 
-&nbsp;       heroku container:release web --app $HEROKU\_APP\_NAME
+       heroku container:release web --app $HEROKU\_APP\_NAME
 
-&nbsp;   
+   
 
-&nbsp;   - name: Verify deployment
+   - name: Verify deployment
 
-&nbsp;     env:
+     env:
 
-&nbsp;       HEROKU\_APP\_NAME: ${{ secrets.HEROKU\_APP\_NAME }}
+       HEROKU\_APP\_NAME: ${{ secrets.HEROKU_APP_NAME }}
 
-&nbsp;     run: |
+     run: |
 
-&nbsp;       curl -f https://$HEROKU\_APP\_NAME.herokuapp.com/health || exit 1
+       curl -f https://$HEROKU\_APP\_NAME.herokuapp.com/health || exit 1
 
-&nbsp;       echo "✅ Deployment verified successfully!"
+       echo "✅ Deployment verified successfully!"
 
 
 
-&nbsp; notify:
+ notify:
 
-&nbsp;   name: Send Notifications
+   name: Send Notifications
 
-&nbsp;   runs-on: ubuntu-latest
+   runs-on: ubuntu-latest
 
-&nbsp;   needs: \[test, code-quality, build, deploy]
+   needs: [test, code-quality, build, deploy]
 
-&nbsp;   if: always()
+   if: always()
 
-&nbsp;   
+   
 
-&nbsp;   steps:
+   steps:
 
-&nbsp;   - name: Send Discord notification (Success)
+   - name: Send Discord notification (Success)
 
-&nbsp;     if: ${{ success() }}
+     if: ${{ success() }}
 
-&nbsp;     env:
+     env:
 
-&nbsp;       DISCORD\_WEBHOOK: ${{ secrets.DISCORD\_WEBHOOK }}
+       DISCORD\_WEBHOOK: ${{ secrets.DISCORD\_WEBHOOK }}
 
-&nbsp;     run: |
+     run: |
 
-&nbsp;       curl -H "Content-Type: application/json" \\
+       curl -H "Content-Type: application/json" \\
 
-&nbsp;         -X POST \\
+         -X POST \\
 
-&nbsp;         -d '{
+         -d '{
 
-&nbsp;           "username": "CI/CD Bot",
+           "username": "CI/CD Bot",
 
-&nbsp;           "avatar\_url": "https://github.githubassets.com/images/modules/logos\_page/GitHub-Mark.png",
+           "avatar\_url": "https://github.githubassets.com/images/modules/logos\_page/GitHub-Mark.png",
 
-&nbsp;           "embeds": \[{
+           "embeds": \[{
 
-&nbsp;             "title": "✅ Pipeline Succeeded",
+             "title": "✅ Pipeline Succeeded",
 
-&nbsp;             "description": "All stages completed successfully!",
+             "description": "All stages completed successfully!",
 
-&nbsp;             "color": 3066993,
+             "color": 3066993,
 
-&nbsp;             "fields": \[
+             "fields": \[
 
-&nbsp;               {"name": "Repository", "value": "${{ github.repository }}", "inline": true},
+               {"name": "Repository", "value": "${{ github.repository }}", "inline": true},
 
-&nbsp;               {"name": "Branch", "value": "${{ github.ref\_name }}", "inline": true},
+               {"name": "Branch", "value": "${{ github.ref\_name }}", "inline": true},
 
-&nbsp;               {"name": "Commit", "value": "`${{ github.sha }}`", "inline": false},
+               {"name": "Commit", "value": "`${{ github.sha }}`", "inline": false},
 
-&nbsp;               {"name": "Author", "value": "${{ github.actor }}", "inline": true},
+               {"name": "Author", "value": "${{ github.actor }}", "inline": true},
 
-&nbsp;               {"name": "Workflow", "value": "${{ github.workflow }}", "inline": true}
+               {"name": "Workflow", "value": "${{ github.workflow }}", "inline": true}
 
-&nbsp;             ],
+             ],
 
-&nbsp;             "timestamp": "${{ github.event.head\_commit.timestamp }}"
+             "timestamp": "${{ github.event.head\_commit.timestamp }}"
 
-&nbsp;           }]
+           }]
 
-&nbsp;         }' \\
+         }' \\
 
-&nbsp;         $DISCORD\_WEBHOOK
+         $DISCORD\_WEBHOOK
 
-&nbsp;   
+   
 
-&nbsp;   - name: Send Discord notification (Failure)
+   - name: Send Discord notification (Failure)
 
-&nbsp;     if: ${{ failure() }}
+     if: ${{ failure() }}
 
-&nbsp;     env:
+     env:
 
-&nbsp;       DISCORD\_WEBHOOK: ${{ secrets.DISCORD\_WEBHOOK }}
+       DISCORD\_WEBHOOK: ${{ secrets.DISCORD\_WEBHOOK }}
 
-&nbsp;     run: |
+     run: |
 
-&nbsp;       curl -H "Content-Type: application/json" \\
+       curl -H "Content-Type: application/json" \\
 
-&nbsp;         -X POST \\
+         -X POST \\
 
-&nbsp;         -d '{
+         -d '{
 
-&nbsp;           "username": "CI/CD Bot",
+           "username": "CI/CD Bot",
 
-&nbsp;           "avatar\_url": "https://github.githubassets.com/images/modules/logos\_page/GitHub-Mark.png",
+           "avatar\_url": "https://github.githubassets.com/images/modules/logos\_page/GitHub-Mark.png",
 
-&nbsp;           "embeds": \[{
+           "embeds": \[{
 
-&nbsp;             "title": "❌ Pipeline Failed",
+             "title": "❌ Pipeline Failed",
 
-&nbsp;             "description": "One or more stages failed. Check the logs for details.",
+             "description": "One or more stages failed. Check the logs for details.",
 
-&nbsp;             "color": 15158332,
+             "color": 15158332,
 
-&nbsp;             "fields": \[
+             "fields": \[
 
-&nbsp;               {"name": "Repository", "value": "${{ github.repository }}", "inline": true},
+               {"name": "Repository", "value": "${{ github.repository }}", "inline": true},
 
-&nbsp;               {"name": "Branch", "value": "${{ github.ref\_name }}", "inline": true},
+               {"name": "Branch", "value": "${{ github.ref\_name }}", "inline": true},
 
-&nbsp;               {"name": "Commit", "value": "`${{ github.sha }}`", "inline": false},
+               {"name": "Commit", "value": "`${{ github.sha }}`", "inline": false},
 
-&nbsp;               {"name": "Author", "value": "${{ github.actor }}", "inline": true},
+               {"name": "Author", "value": "${{ github.actor }}", "inline": true},
 
-&nbsp;               {"name": "Run URL", "value": "\[View Logs](${{ github.server\_url }}/${{ github.repository }}/actions/runs/${{ github.run\_id }})", "inline": false}
+               {"name": "Run URL", "value": "\[View Logs](${{ github.server\_url }}/${{ github.repository }}/actions/runs/${{ github.run\_id }})", "inline": false}
 
-&nbsp;             ],
+             ],
 
-&nbsp;             "timestamp": "${{ github.event.head\_commit.timestamp }}"
+             "timestamp": "${{ github.event.head\_commit.timestamp }}"
 
-&nbsp;           }]
+           }]
 
-&nbsp;         }' \\
+         }' \\
 
-&nbsp;         $DISCORD\_WEBHOOK
+         $DISCORD\_WEBHOOK
 
