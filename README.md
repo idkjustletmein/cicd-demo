@@ -1,4 +1,4 @@
-# CI/CD Pipeline Demo - Task Management API
+# CI/CD Pipeline Demo - Task Management API for niggers
 
 A Flask-based REST API demonstrating automated CI/CD pipeline implementation with GitHub Actions, pytest, SonarQube, Docker, and Heroku.
 
